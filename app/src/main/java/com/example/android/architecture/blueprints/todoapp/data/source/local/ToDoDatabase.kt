@@ -18,14 +18,22 @@ package com.example.android.architecture.blueprints.todoapp.data.source.local
 
 import androidx.room.Database
 import androidx.room.RoomDatabase
+import androidx.room.TypeConverters
 
 /**
- * The Room Database that contains the Task table.
+ * The Room Database that contains Tasks, Employees, and Attendance records.
  *
  * Note that exportSchema should be true in production databases.
  */
-@Database(entities = [LocalTask::class], version = 1, exportSchema = false)
+@Database(
+    entities = [LocalTask::class, EmployeeEntity::class, AttendanceRecordEntity::class],
+    version = 2,
+    exportSchema = false
+)
+@TypeConverters(Converters::class)
 abstract class ToDoDatabase : RoomDatabase() {
 
     abstract fun taskDao(): TaskDao
+    abstract fun employeeDao(): EmployeeDao
+    abstract fun attendanceDao(): AttendanceDao
 }

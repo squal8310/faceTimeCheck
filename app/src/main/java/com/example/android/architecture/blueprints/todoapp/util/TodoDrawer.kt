@@ -27,6 +27,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Badge
+import androidx.compose.material.icons.filled.HowToReg
+import androidx.compose.material.icons.filled.Payments
 import androidx.compose.material3.DrawerState
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -39,6 +43,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.painter.Painter
+import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.res.dimensionResource
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -66,6 +71,9 @@ fun AppModalDrawer(
                 currentRoute = currentRoute,
                 navigateToTasks = { navigationActions.navigateToTasks() },
                 navigateToStatistics = { navigationActions.navigateToStatistics() },
+                navigateToEmployees = { navigationActions.navigateToEmployees() },
+                navigateToAttendance = { navigationActions.navigateToAttendance() },
+                navigateToPayroll = { navigationActions.navigateToPayroll() },
                 closeDrawer = { coroutineScope.launch { drawerState.close() } }
             )
         }
@@ -79,6 +87,9 @@ private fun AppDrawer(
     currentRoute: String,
     navigateToTasks: () -> Unit,
     navigateToStatistics: () -> Unit,
+    navigateToEmployees: () -> Unit,
+    navigateToAttendance: () -> Unit,
+    navigateToPayroll: () -> Unit,
     closeDrawer: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -100,6 +111,33 @@ private fun AppDrawer(
                 isSelected = currentRoute == TodoDestinations.STATISTICS_ROUTE,
                 action = {
                     navigateToStatistics()
+                    closeDrawer()
+                }
+            )
+            DrawerButton(
+                painter = rememberVectorPainter(Icons.Default.Badge),
+                label = stringResource(id = R.string.employees_title),
+                isSelected = currentRoute == TodoDestinations.EMPLOYEES_ROUTE,
+                action = {
+                    navigateToEmployees()
+                    closeDrawer()
+                }
+            )
+            DrawerButton(
+                painter = rememberVectorPainter(Icons.Default.HowToReg),
+                label = stringResource(id = R.string.attendance_title),
+                isSelected = currentRoute == TodoDestinations.ATTENDANCE_ROUTE,
+                action = {
+                    navigateToAttendance()
+                    closeDrawer()
+                }
+            )
+            DrawerButton(
+                painter = rememberVectorPainter(Icons.Default.Payments),
+                label = stringResource(id = R.string.payroll_title),
+                isSelected = currentRoute == TodoDestinations.PAYROLL_ROUTE,
+                action = {
+                    navigateToPayroll()
                     closeDrawer()
                 }
             )
@@ -160,7 +198,7 @@ private fun DrawerButton(
         ) {
             Icon(
                 painter = painter,
-                contentDescription = null, // decorative
+                contentDescription = null,
                 tint = tintColor
             )
             Spacer(Modifier.width(16.dp))
@@ -182,6 +220,9 @@ fun PreviewAppDrawer() {
                 currentRoute = TodoDestinations.TASKS_ROUTE,
                 navigateToTasks = {},
                 navigateToStatistics = {},
+                navigateToEmployees = {},
+                navigateToAttendance = {},
+                navigateToPayroll = {},
                 closeDrawer = {}
             )
         }

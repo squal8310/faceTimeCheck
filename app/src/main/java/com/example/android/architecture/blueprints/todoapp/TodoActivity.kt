@@ -17,10 +17,10 @@
 package com.example.android.architecture.blueprints.todoapp
 
 import android.os.Bundle
-import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.material3.Scaffold
+import androidx.fragment.app.FragmentActivity
 import com.example.android.architecture.blueprints.todoapp.ui.components.FloatingVoiceInput
 import dagger.hilt.android.AndroidEntryPoint
 
@@ -28,7 +28,7 @@ import dagger.hilt.android.AndroidEntryPoint
  * Main activity for the todoapp
  */
 @AndroidEntryPoint
-class TodoActivity : ComponentActivity() {
+class TodoActivity : FragmentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)

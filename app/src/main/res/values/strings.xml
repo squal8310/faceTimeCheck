@@ -39,6 +39,11 @@
     <string name="successfully_saved_task_message">Task saved</string>
     <string name="list_title">Task List</string>
     <string name="statistics_title">Statistics</string>
+    <string name="employees_title">Gestión de Empleados</string>
+    <string name="attendance_title">Checador de Asistencia</string>
+    <string name="payroll_title">Cálculo de Nómina</string>
+    <string name="add_employee">Nuevo Empleado</string>
+    <string name="edit_employee">Editar Empleado</string>
     <string name="statistics_no_tasks">You have no tasks.</string>
     <string name="statistics_active_tasks">Active tasks: %.1f%%</string>
     <string name="statistics_completed_tasks">Completed tasks: %.1f%%</string>

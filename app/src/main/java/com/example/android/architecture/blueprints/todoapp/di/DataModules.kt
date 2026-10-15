@@ -18,8 +18,14 @@ package com.example.android.architecture.blueprints.todoapp.di
 
 import android.content.Context
 import androidx.room.Room
+import com.example.android.architecture.blueprints.todoapp.data.AttendanceRepository
+import com.example.android.architecture.blueprints.todoapp.data.DefaultAttendanceRepository
+import com.example.android.architecture.blueprints.todoapp.data.DefaultEmployeeRepository
 import com.example.android.architecture.blueprints.todoapp.data.DefaultTaskRepository
+import com.example.android.architecture.blueprints.todoapp.data.EmployeeRepository
 import com.example.android.architecture.blueprints.todoapp.data.TaskRepository
+import com.example.android.architecture.blueprints.todoapp.data.source.local.AttendanceDao
+import com.example.android.architecture.blueprints.todoapp.data.source.local.EmployeeDao
 import com.example.android.architecture.blueprints.todoapp.data.source.local.TaskDao
 import com.example.android.architecture.blueprints.todoapp.data.source.local.ToDoDatabase
 import com.example.android.architecture.blueprints.todoapp.data.source.network.NetworkDataSource
@@ -39,6 +45,14 @@ abstract class RepositoryModule {
     @Singleton
     @Binds
     abstract fun bindTaskRepository(repository: DefaultTaskRepository): TaskRepository
+
+    @Singleton
+    @Binds
+    abstract fun bindEmployeeRepository(repository: DefaultEmployeeRepository): EmployeeRepository
+
+    @Singleton
+    @Binds
+    abstract fun bindAttendanceRepository(repository: DefaultAttendanceRepository): AttendanceRepository
 }
 
 @Module
@@ -61,9 +75,17 @@ object DatabaseModule {
             context.applicationContext,
             ToDoDatabase::class.java,
             "Tasks.db"
-        ).build()
+        )
+        .fallbackToDestructiveMigration()
+        .build()
     }
 
     @Provides
     fun provideTaskDao(database: ToDoDatabase): TaskDao = database.taskDao()
+
+    @Provides
+    fun provideEmployeeDao(database: ToDoDatabase): EmployeeDao = database.employeeDao()
+
+    @Provides
+    fun provideAttendanceDao(database: ToDoDatabase): AttendanceDao = database.attendanceDao()
 }

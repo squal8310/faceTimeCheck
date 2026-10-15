@@ -18,10 +18,15 @@ package com.example.android.architecture.blueprints.todoapp
 
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
+import com.example.android.architecture.blueprints.todoapp.TodoDestinationsArgs.EMPLOYEE_ID_ARG
 import com.example.android.architecture.blueprints.todoapp.TodoDestinationsArgs.TASK_ID_ARG
 import com.example.android.architecture.blueprints.todoapp.TodoDestinationsArgs.TITLE_ARG
 import com.example.android.architecture.blueprints.todoapp.TodoDestinationsArgs.USER_MESSAGE_ARG
+import com.example.android.architecture.blueprints.todoapp.TodoScreens.ADD_EDIT_EMPLOYEE_SCREEN
 import com.example.android.architecture.blueprints.todoapp.TodoScreens.ADD_EDIT_TASK_SCREEN
+import com.example.android.architecture.blueprints.todoapp.TodoScreens.ATTENDANCE_SCREEN
+import com.example.android.architecture.blueprints.todoapp.TodoScreens.EMPLOYEES_SCREEN
+import com.example.android.architecture.blueprints.todoapp.TodoScreens.PAYROLL_SCREEN
 import com.example.android.architecture.blueprints.todoapp.TodoScreens.STATISTICS_SCREEN
 import com.example.android.architecture.blueprints.todoapp.TodoScreens.TASKS_SCREEN
 import com.example.android.architecture.blueprints.todoapp.TodoScreens.TASK_DETAIL_SCREEN
@@ -34,6 +39,10 @@ private object TodoScreens {
     const val STATISTICS_SCREEN = "statistics"
     const val TASK_DETAIL_SCREEN = "task"
     const val ADD_EDIT_TASK_SCREEN = "addEditTask"
+    const val EMPLOYEES_SCREEN = "employees"
+    const val ADD_EDIT_EMPLOYEE_SCREEN = "addEditEmployee"
+    const val ATTENDANCE_SCREEN = "attendance"
+    const val PAYROLL_SCREEN = "payroll"
 }
 
 /**
@@ -42,6 +51,7 @@ private object TodoScreens {
 object TodoDestinationsArgs {
     const val USER_MESSAGE_ARG = "userMessage"
     const val TASK_ID_ARG = "taskId"
+    const val EMPLOYEE_ID_ARG = "employeeId"
     const val TITLE_ARG = "title"
 }
 
@@ -53,6 +63,10 @@ object TodoDestinations {
     const val STATISTICS_ROUTE = STATISTICS_SCREEN
     const val TASK_DETAIL_ROUTE = "$TASK_DETAIL_SCREEN/{$TASK_ID_ARG}"
     const val ADD_EDIT_TASK_ROUTE = "$ADD_EDIT_TASK_SCREEN/{$TITLE_ARG}?$TASK_ID_ARG={$TASK_ID_ARG}"
+    const val EMPLOYEES_ROUTE = EMPLOYEES_SCREEN
+    const val ADD_EDIT_EMPLOYEE_ROUTE = "$ADD_EDIT_EMPLOYEE_SCREEN?$EMPLOYEE_ID_ARG={$EMPLOYEE_ID_ARG}"
+    const val ATTENDANCE_ROUTE = ATTENDANCE_SCREEN
+    const val PAYROLL_ROUTE = PAYROLL_SCREEN
 }
 
 /**
@@ -78,16 +92,49 @@ class TodoNavigationActions(private val navController: NavHostController) {
 
     fun navigateToStatistics() {
         navController.navigate(TodoDestinations.STATISTICS_ROUTE) {
-            // Pop up to the start destination of the graph to
-            // avoid building up a large stack of destinations
-            // on the back stack as users select items
             popUpTo(navController.graph.findStartDestination().id) {
                 saveState = true
             }
-            // Avoid multiple copies of the same destination when
-            // reselecting the same item
             launchSingleTop = true
-            // Restore state when reselecting a previously selected item
+            restoreState = true
+        }
+    }
+
+    fun navigateToEmployees() {
+        navController.navigate(TodoDestinations.EMPLOYEES_ROUTE) {
+            popUpTo(navController.graph.findStartDestination().id) {
+                saveState = true
+            }
+            launchSingleTop = true
+            restoreState = true
+        }
+    }
+
+    fun navigateToAddEditEmployee(employeeId: String? = null) {
+        val route = if (employeeId != null) {
+            "$ADD_EDIT_EMPLOYEE_SCREEN?$EMPLOYEE_ID_ARG=$employeeId"
+        } else {
+            ADD_EDIT_EMPLOYEE_SCREEN
+        }
+        navController.navigate(route)
+    }
+
+    fun navigateToAttendance() {
+        navController.navigate(TodoDestinations.ATTENDANCE_ROUTE) {
+            popUpTo(navController.graph.findStartDestination().id) {
+                saveState = true
+            }
+            launchSingleTop = true
+            restoreState = true
+        }
+    }
+
+    fun navigateToPayroll() {
+        navController.navigate(TodoDestinations.PAYROLL_ROUTE) {
+            popUpTo(navController.graph.findStartDestination().id) {
+                saveState = true
+            }
+            launchSingleTop = true
             restoreState = true
         }
     }

@@ -32,10 +32,15 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.example.android.architecture.blueprints.todoapp.TodoDestinationsArgs.EMPLOYEE_ID_ARG
 import com.example.android.architecture.blueprints.todoapp.TodoDestinationsArgs.TASK_ID_ARG
 import com.example.android.architecture.blueprints.todoapp.TodoDestinationsArgs.TITLE_ARG
 import com.example.android.architecture.blueprints.todoapp.TodoDestinationsArgs.USER_MESSAGE_ARG
 import com.example.android.architecture.blueprints.todoapp.addedittask.AddEditTaskScreen
+import com.example.android.architecture.blueprints.todoapp.attendance.AttendanceClockScreen
+import com.example.android.architecture.blueprints.todoapp.employees.AddEditEmployeeScreen
+import com.example.android.architecture.blueprints.todoapp.employees.EmployeesScreen
+import com.example.android.architecture.blueprints.todoapp.payroll.PayrollScreen
 import com.example.android.architecture.blueprints.todoapp.statistics.StatisticsScreen
 import com.example.android.architecture.blueprints.todoapp.taskdetail.TaskDetailScreen
 import com.example.android.architecture.blueprints.todoapp.tasks.TasksScreen
@@ -81,6 +86,39 @@ fun TodoNavGraph(
         composable(TodoDestinations.STATISTICS_ROUTE) {
             AppModalDrawer(drawerState, currentRoute, navActions) {
                 StatisticsScreen(openDrawer = { coroutineScope.launch { drawerState.open() } })
+            }
+        }
+        composable(TodoDestinations.EMPLOYEES_ROUTE) {
+            AppModalDrawer(drawerState, currentRoute, navActions) {
+                EmployeesScreen(
+                    openDrawer = { coroutineScope.launch { drawerState.open() } },
+                    onAddEmployee = { navActions.navigateToAddEditEmployee() },
+                    onEditEmployee = { employeeId -> navActions.navigateToAddEditEmployee(employeeId) }
+                )
+            }
+        }
+        composable(
+            TodoDestinations.ADD_EDIT_EMPLOYEE_ROUTE,
+            arguments = listOf(
+                navArgument(EMPLOYEE_ID_ARG) { type = NavType.StringType; nullable = true }
+            )
+        ) {
+            AddEditEmployeeScreen(
+                onBack = { navController.popBackStack() }
+            )
+        }
+        composable(TodoDestinations.ATTENDANCE_ROUTE) {
+            AppModalDrawer(drawerState, currentRoute, navActions) {
+                AttendanceClockScreen(
+                    openDrawer = { coroutineScope.launch { drawerState.open() } }
+                )
+            }
+        }
+        composable(TodoDestinations.PAYROLL_ROUTE) {
+            AppModalDrawer(drawerState, currentRoute, navActions) {
+                PayrollScreen(
+                    openDrawer = { coroutineScope.launch { drawerState.open() } }
+                )
             }
         }
         composable(

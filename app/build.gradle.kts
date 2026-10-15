@@ -107,6 +107,10 @@ android {
         excludes += "META-INF/LGPL2.1"
     }
 
+    androidResources {
+        noCompress += "tflite"
+    }
+
     tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
         kotlinOptions {
             freeCompilerArgs += "-opt-in=kotlin.RequiresOptIn"
@@ -138,6 +142,19 @@ dependencies {
     implementation(libs.hilt.android.core)
     implementation(libs.androidx.hilt.navigation.compose)
     ksp(libs.hilt.compiler)
+
+    // Biometrics & CameraX
+    implementation(libs.androidx.biometric)
+    implementation(libs.androidx.biometric.ktx)
+    implementation(libs.androidx.camera.core)
+    implementation(libs.androidx.camera.camera2)
+    implementation(libs.androidx.camera.lifecycle)
+    implementation(libs.androidx.camera.view)
+
+    // ML Kit & TensorFlow Lite
+    implementation(libs.google.mlkit.face.detection)
+    implementation(libs.tensorflow.lite)
+    implementation(libs.tensorflow.lite.support)
 
     // Jetpack Compose
     val composeBom = platform(libs.androidx.compose.bom)
