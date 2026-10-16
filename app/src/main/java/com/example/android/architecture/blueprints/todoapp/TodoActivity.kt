@@ -19,13 +19,11 @@ package com.example.android.architecture.blueprints.todoapp
 import android.os.Bundle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.material3.Scaffold
 import androidx.fragment.app.FragmentActivity
-import com.example.android.architecture.blueprints.todoapp.ui.components.FloatingVoiceInput
 import dagger.hilt.android.AndroidEntryPoint
 
 /**
- * Main activity for the todoapp
+ * Main activity for the app
  */
 @AndroidEntryPoint
 class TodoActivity : FragmentActivity() {
@@ -35,13 +33,7 @@ class TodoActivity : FragmentActivity() {
         enableEdgeToEdge()
         setContent {
             TodoTheme {
-                Scaffold(
-                    floatingActionButton = {
-                        FloatingVoiceInput()
-                    }
-                ) { paddingValues ->
-                    TodoNavGraph()
-                }
+                TodoNavGraph()
             }
         }
     }

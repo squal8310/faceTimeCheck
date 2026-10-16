@@ -46,13 +46,16 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.res.dimensionResource
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import com.example.android.architecture.blueprints.todoapp.ExecutiveNavyPrimary
 import com.example.android.architecture.blueprints.todoapp.R
 import com.example.android.architecture.blueprints.todoapp.TodoDestinations
 import com.example.android.architecture.blueprints.todoapp.TodoNavigationActions
@@ -93,8 +96,6 @@ fun AppModalDrawer(
         drawerContent = {
             AppDrawer(
                 currentRoute = currentRoute,
-                navigateToTasks = { navigationActions.navigateToTasks() },
-                navigateToStatistics = { navigationActions.navigateToStatistics() },
                 navigateToEmployees = {
                     if (verifyAdminPin != null) {
                         pendingAction = { navigationActions.navigateToEmployees() }
@@ -123,8 +124,6 @@ fun AppModalDrawer(
 @Composable
 private fun AppDrawer(
     currentRoute: String,
-    navigateToTasks: () -> Unit,
-    navigateToStatistics: () -> Unit,
     navigateToEmployees: () -> Unit,
     navigateToAttendance: () -> Unit,
     navigateToPayroll: () -> Unit,
@@ -135,20 +134,11 @@ private fun AppDrawer(
         Column(modifier = modifier.fillMaxSize()) {
             DrawerHeader()
             DrawerButton(
-                painter = painterResource(id = R.drawable.ic_list),
-                label = stringResource(id = R.string.list_title),
-                isSelected = currentRoute == TodoDestinations.TASKS_ROUTE,
+                painter = rememberVectorPainter(Icons.Default.HowToReg),
+                label = stringResource(id = R.string.attendance_title),
+                isSelected = currentRoute == TodoDestinations.ATTENDANCE_ROUTE,
                 action = {
-                    navigateToTasks()
-                    closeDrawer()
-                }
-            )
-            DrawerButton(
-                painter = painterResource(id = R.drawable.ic_statistics),
-                label = stringResource(id = R.string.statistics_title),
-                isSelected = currentRoute == TodoDestinations.STATISTICS_ROUTE,
-                action = {
-                    navigateToStatistics()
+                    navigateToAttendance()
                     closeDrawer()
                 }
             )
@@ -158,15 +148,6 @@ private fun AppDrawer(
                 isSelected = currentRoute == TodoDestinations.EMPLOYEES_ROUTE,
                 action = {
                     navigateToEmployees()
-                    closeDrawer()
-                }
-            )
-            DrawerButton(
-                painter = rememberVectorPainter(Icons.Default.HowToReg),
-                label = stringResource(id = R.string.attendance_title),
-                isSelected = currentRoute == TodoDestinations.ATTENDANCE_ROUTE,
-                action = {
-                    navigateToAttendance()
                     closeDrawer()
                 }
             )
@@ -192,7 +173,7 @@ private fun DrawerHeader(
         verticalArrangement = Arrangement.Center,
         modifier = modifier
             .fillMaxWidth()
-            .background(primaryDarkColor)
+            .background(ExecutiveNavyPrimary)
             .height(dimensionResource(id = R.dimen.header_height))
             .padding(dimensionResource(id = R.dimen.header_padding))
     ) {
@@ -202,9 +183,11 @@ private fun DrawerHeader(
             stringResource(id = R.string.tasks_header_image_content_description),
             modifier = Modifier.width(dimensionResource(id = R.dimen.header_image_width))
         )
+        Spacer(Modifier.height(8.dp))
         Text(
             text = stringResource(id = R.string.navigation_view_header_title),
-            color = MaterialTheme.colorScheme.surface
+            color = Color.White,
+            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
         )
     }
 }
@@ -218,7 +201,7 @@ private fun DrawerButton(
     modifier: Modifier = Modifier
 ) {
     val tintColor = if (isSelected) {
-        MaterialTheme.colorScheme.secondary
+        MaterialTheme.colorScheme.primary
     } else {
         MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
     }
@@ -242,8 +225,9 @@ private fun DrawerButton(
             Spacer(Modifier.width(16.dp))
             Text(
                 text = label,
-                style = MaterialTheme.typography.bodySmall,
-                color = tintColor
+                style = MaterialTheme.typography.titleSmall,
+                color = tintColor,
+                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
             )
         }
     }
@@ -255,9 +239,7 @@ fun PreviewAppDrawer() {
     TodoTheme {
         Surface {
             AppDrawer(
-                currentRoute = TodoDestinations.TASKS_ROUTE,
-                navigateToTasks = {},
-                navigateToStatistics = {},
+                currentRoute = TodoDestinations.ATTENDANCE_ROUTE,
                 navigateToEmployees = {},
                 navigateToAttendance = {},
                 navigateToPayroll = {},
