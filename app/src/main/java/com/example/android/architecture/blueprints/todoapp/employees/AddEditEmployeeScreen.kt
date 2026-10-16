@@ -36,7 +36,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Face3
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -49,6 +51,9 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
@@ -69,6 +74,7 @@ fun AddEditEmployeeScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
+    var show3DEnrollmentDialog by remember { mutableStateOf(false) }
 
     val cameraLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.TakePicturePreview()
@@ -92,6 +98,20 @@ fun AddEditEmployeeScreen(
         } else {
             Timber.tag("FaceBiometrics").w("Permiso de cámara denegado por el usuario en registro.")
         }
+    }
+
+    if (show3DEnrollmentDialog) {
+        MultiAngleFaceEnrollmentDialog(
+            faceDetectorHelper = viewModel.faceDetectorHelper,
+            faceEmbedder = viewModel.faceEmbedder,
+            onEnrollmentComplete = { compositeVector, previewBmp ->
+                viewModel.saveCompositeFaceEmbedding(compositeVector, previewBmp)
+                show3DEnrollmentDialog = false
+            },
+            onDismiss = {
+                show3DEnrollmentDialog = false
+            }
+        )
     }
 
     LaunchedEffect(uiState.isSaved) {
@@ -180,7 +200,30 @@ fun AddEditEmployeeScreen(
             )
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Botón para tomar/subir la foto facial del empleado (protegido contra SecurityException)
+            // Opción 1: Enrolamiento Biométrico 3D Guiado con Giros de Cabeza
+            Button(
+                onClick = {
+                    val hasPermission = ContextCompat.checkSelfPermission(
+                        context,
+                        Manifest.permission.CAMERA
+                    ) == PackageManager.PERMISSION_GRANTED
+
+                    if (hasPermission) {
+                        show3DEnrollmentDialog = true
+                    } else {
+                        permissionLauncher.launch(Manifest.permission.CAMERA)
+                    }
+                },
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.tertiary),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Icon(Icons.Default.Face3, contentDescription = null)
+                Text(text = " 📷 Enrolamiento Biométrico 3D Guiado (Giros)")
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Opción 2: Foto rápida individual
             OutlinedButton(
                 onClick = {
                     val hasPermission = ContextCompat.checkSelfPermission(
@@ -206,7 +249,7 @@ fun AddEditEmployeeScreen(
                 Icon(Icons.Default.CameraAlt, contentDescription = null)
                 Text(
                     text = if (uiState.isBiometricEnrolled)
-                        " Actualizar Foto Facial" else " Capturar Foto Facial (Enrolamiento)"
+                        " Capturar Foto Rápida 2D" else " Capturar Foto Rápida 2D"
                 )
             }
 
@@ -222,7 +265,7 @@ fun AddEditEmployeeScreen(
             if (uiState.isBiometricEnrolled) {
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = "✓ Rostro Enrolado Exitosamente",
+                    text = "✓ Rostro Enrolado Exitosamente (Geometría Biómétrica Lista)",
                     color = MaterialTheme.colorScheme.primary,
                     style = MaterialTheme.typography.bodyMedium
                 )

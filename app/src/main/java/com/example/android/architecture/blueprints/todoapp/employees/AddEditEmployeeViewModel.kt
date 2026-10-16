@@ -20,6 +20,7 @@ import android.graphics.Bitmap
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.android.architecture.blueprints.todoapp.biometrics.FaceDetectorHelper
 import com.example.android.architecture.blueprints.todoapp.biometrics.TensorFlowFaceEmbedder
 import com.example.android.architecture.blueprints.todoapp.data.EmployeeRepository
 import com.example.android.architecture.blueprints.todoapp.data.source.local.EmployeeEntity
@@ -52,7 +53,8 @@ data class AddEditEmployeeUiState(
 @HiltViewModel
 class AddEditEmployeeViewModel @Inject constructor(
     private val employeeRepository: EmployeeRepository,
-    private val faceEmbedder: TensorFlowFaceEmbedder,
+    val faceEmbedder: TensorFlowFaceEmbedder,
+    val faceDetectorHelper: FaceDetectorHelper,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
@@ -105,6 +107,18 @@ class AddEditEmployeeViewModel @Inject constructor(
                     isBiometricEnrolled = true
                 )
             }
+        }
+    }
+
+    fun saveCompositeFaceEmbedding(embeddingList: List<Float>, previewBitmap: Bitmap) {
+        Timber.tag("FaceBiometrics").i("=== ENROLAMIENTO 3D MULTI-ÁNGULO COMPLETADO ===")
+        Timber.tag("FaceBiometrics").i("Vector compuesto generado con %d valores flotantes.", embeddingList.size)
+        _uiState.update {
+            it.copy(
+                capturedBitmap = previewBitmap,
+                faceEmbedding = embeddingList,
+                isBiometricEnrolled = true
+            )
         }
     }
 
