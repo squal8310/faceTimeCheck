@@ -50,20 +50,26 @@ class PayrollCalculatorUseCase @Inject constructor() {
         var pendingCheckIn: AttendanceRecordEntity? = null
 
         for (record in sortedRecords) {
-            if (record.type == AttendanceType.CHECK_IN) {
-                pendingCheckIn = record
-            } else if (record.type == AttendanceType.CHECK_OUT && pendingCheckIn != null) {
-                val durationMillis = record.timestamp - pendingCheckIn.timestamp
-                val hoursWorked = (durationMillis / (1000.0 * 60.0 * 60.0)).coerceAtLeast(0.0)
-
-                val limit = employee.dailyHoursLimit
-                if (hoursWorked <= limit) {
-                    regularHours += hoursWorked
-                } else {
-                    regularHours += limit
-                    overtimeHours += (hoursWorked - limit)
+            when (record.type) {
+                AttendanceType.CHECK_IN, AttendanceType.MEAL_IN -> {
+                    pendingCheckIn = record
                 }
-                pendingCheckIn = null
+                AttendanceType.MEAL_OUT, AttendanceType.CHECK_OUT -> {
+                    if (pendingCheckIn != null) {
+                        val durationMillis = record.timestamp - pendingCheckIn.timestamp
+                        val hoursWorked = (durationMillis / (1000.0 * 60.0 * 60.0)).coerceAtLeast(0.0)
+
+                        val limit = employee.dailyHoursLimit
+                        if (regularHours + hoursWorked <= limit) {
+                            regularHours += hoursWorked
+                        } else {
+                            val remainingReg = (limit - regularHours).coerceAtLeast(0.0)
+                            regularHours += remainingReg
+                            overtimeHours += (hoursWorked - remainingReg)
+                        }
+                        pendingCheckIn = null
+                    }
+                }
             }
         }
 

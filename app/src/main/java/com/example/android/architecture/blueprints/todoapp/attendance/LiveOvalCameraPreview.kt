@@ -78,7 +78,7 @@ class OvalShape : Shape {
 fun LiveOvalCameraPreview(
     faceDetectorHelper: FaceDetectorHelper,
     isSuccess: Boolean = false,
-    isLocked: Boolean = false,
+    isAlreadyRegisteredToday: Boolean = false,
     onFaceDetected: (Bitmap) -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -97,7 +97,11 @@ fun LiveOvalCameraPreview(
         hasCameraPermission = isGranted
     }
 
-    val borderColor = if (isSuccess || isLocked) Color(0xFF4CAF50) else MaterialTheme.colorScheme.primary
+    val borderColor = when {
+        isSuccess -> Color(0xFF4CAF50) // Verde: Registro Exitoso
+        isAlreadyRegisteredToday -> Color(0xFFFF9800) // Ámbar/Naranja: Ya registrado hoy
+        else -> MaterialTheme.colorScheme.primary // Azul: Listo para escanear
+    }
 
     if (!hasCameraPermission) {
         Column(
@@ -145,16 +149,10 @@ fun LiveOvalCameraPreview(
                             .build()
 
                         imageAnalysis.setAnalyzer(cameraExecutor) { imageProxy ->
-                            if (isLocked) {
-                                imageProxy.close()
-                                return@setAnalyzer
-                            }
                             faceDetectorHelper.processImageProxy(
                                 imageProxy = imageProxy,
                                 onFaceDetected = { croppedBitmap, _ ->
-                                    if (!isLocked) {
-                                        onFaceDetected(croppedBitmap)
-                                    }
+                                    onFaceDetected(croppedBitmap)
                                 },
                                 onNoFace = {},
                                 onError = { e ->

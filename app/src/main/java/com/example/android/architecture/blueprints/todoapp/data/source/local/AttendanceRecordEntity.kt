@@ -23,8 +23,10 @@ import androidx.room.PrimaryKey
 import java.util.UUID
 
 enum class AttendanceType {
-    CHECK_IN,
-    CHECK_OUT
+    CHECK_IN,   // 1. Entrada a laborar
+    MEAL_OUT,   // 2. Salida a comer
+    MEAL_IN,    // 3. Regreso de comer
+    CHECK_OUT   // 4. Salida definitiva
 }
 
 enum class VerificationMethod {

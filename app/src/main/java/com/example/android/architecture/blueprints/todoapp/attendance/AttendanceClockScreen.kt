@@ -32,7 +32,6 @@ import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Fingerprint
 import androidx.compose.material.icons.filled.Menu
-import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -54,6 +53,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.fragment.app.FragmentActivity
@@ -93,39 +93,72 @@ fun AttendanceClockScreen(
                 .verticalScroll(rememberScrollState()),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Selector de Modo (ENTRADA / SALIDA)
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceEvenly
-            ) {
-                Button(
-                    onClick = { viewModel.setAttendanceType(AttendanceType.CHECK_IN) },
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = if (uiState.attendanceType == AttendanceType.CHECK_IN)
-                            MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant
-                    )
+            // Filas de Modo de Registro (4 Eventos del Día)
+            Column(modifier = Modifier.fillMaxWidth()) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceEvenly
                 ) {
-                    Text("ENTRADA")
+                    Button(
+                        onClick = { viewModel.setAttendanceType(AttendanceType.CHECK_IN) },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = if (uiState.attendanceType == AttendanceType.CHECK_IN)
+                                MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant
+                        ),
+                        modifier = Modifier.weight(1f).padding(end = 4.dp)
+                    ) {
+                        Text("1. Entrada", style = MaterialTheme.typography.labelSmall)
+                    }
+
+                    Button(
+                        onClick = { viewModel.setAttendanceType(AttendanceType.MEAL_OUT) },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = if (uiState.attendanceType == AttendanceType.MEAL_OUT)
+                                MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.surfaceVariant
+                    ),
+                        modifier = Modifier.weight(1f).padding(start = 4.dp)
+                    ) {
+                        Text("2. A Comer", style = MaterialTheme.typography.labelSmall)
+                    }
                 }
 
-                Button(
-                    onClick = { viewModel.setAttendanceType(AttendanceType.CHECK_OUT) },
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = if (uiState.attendanceType == AttendanceType.CHECK_OUT)
-                            MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.surfaceVariant
-                    )
+                Spacer(modifier = Modifier.height(6.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceEvenly
                 ) {
-                    Text("SALIDA")
+                    Button(
+                        onClick = { viewModel.setAttendanceType(AttendanceType.MEAL_IN) },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = if (uiState.attendanceType == AttendanceType.MEAL_IN)
+                                MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.surfaceVariant
+                        ),
+                        modifier = Modifier.weight(1f).padding(end = 4.dp)
+                    ) {
+                        Text("3. Regreso Comer", style = MaterialTheme.typography.labelSmall)
+                    }
+
+                    Button(
+                        onClick = { viewModel.setAttendanceType(AttendanceType.CHECK_OUT) },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = if (uiState.attendanceType == AttendanceType.CHECK_OUT)
+                                MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.surfaceVariant
+                        ),
+                        modifier = Modifier.weight(1f).padding(start = 4.dp)
+                    ) {
+                        Text("4. Salida Día", style = MaterialTheme.typography.labelSmall)
+                    }
                 }
             }
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Cámara en Vivo Continuamente Abierta en un Óvalo (Cambia a verde y bloquea al registrar)
+            // Cámara en Vivo Continuamente Abierta en un Óvalo
             LiveOvalCameraPreview(
                 faceDetectorHelper = viewModel.faceDetectorHelper,
                 isSuccess = uiState.isSuccess,
-                isLocked = uiState.isLocked,
+                isAlreadyRegisteredToday = uiState.isAlreadyRegisteredToday,
                 onFaceDetected = { faceBitmap ->
                     viewModel.onLiveFaceDetected(faceBitmap)
                 }
@@ -137,99 +170,89 @@ fun AttendanceClockScreen(
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.cardColors(
-                    containerColor = if (uiState.isSuccess || uiState.isLocked)
-                        MaterialTheme.colorScheme.primaryContainer
-                    else
-                        MaterialTheme.colorScheme.surfaceVariant
+                    containerColor = when {
+                        uiState.isSuccess -> MaterialTheme.colorScheme.primaryContainer
+                        uiState.isAlreadyRegisteredToday -> Color(0xFFFFECB3)
+                        else -> MaterialTheme.colorScheme.surfaceVariant
+                    }
                 )
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text(
                         text = uiState.statusMessage,
                         style = MaterialTheme.typography.titleMedium,
-                        color = if (uiState.isSuccess || uiState.isLocked)
-                            MaterialTheme.colorScheme.onPrimaryContainer
-                        else
-                            MaterialTheme.colorScheme.onSurface
+                        color = when {
+                            uiState.isSuccess -> MaterialTheme.colorScheme.onPrimaryContainer
+                            uiState.isAlreadyRegisteredToday -> Color(0xFFBF360C)
+                            else -> MaterialTheme.colorScheme.onSurface
+                        }
                     )
                 }
             }
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Si está bloqueado tras un registro único, muestra el botón para desbloquear / Siguiente persona
-            if (uiState.isLocked) {
-                Button(
-                    onClick = viewModel::resetClockState,
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+            // Opciones Alternativas / Huella / Manual
+            Box(modifier = Modifier.fillMaxWidth()) {
+                OutlinedButton(
+                    onClick = { isDropdownExpanded = true },
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Icon(Icons.Default.Refresh, contentDescription = null)
-                    Text(" 🔄 Siguiente Persona / Desbloquear Checador")
+                    Text(
+                        text = uiState.selectedEmployee?.fullName ?: "Selección Manual de Empleado (Opcional)",
+                        modifier = Modifier.weight(1f)
+                    )
+                    Icon(Icons.Default.ArrowDropDown, contentDescription = null)
                 }
-            } else {
-                // Opciones Alternativas / Huella / Manual
-                Box(modifier = Modifier.fillMaxWidth()) {
-                    OutlinedButton(
-                        onClick = { isDropdownExpanded = true },
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text(
-                            text = uiState.selectedEmployee?.fullName ?: "Selección Manual de Empleado (Opcional)",
-                            modifier = Modifier.weight(1f)
-                        )
-                        Icon(Icons.Default.ArrowDropDown, contentDescription = null)
-                    }
 
-                    DropdownMenu(
-                        expanded = isDropdownExpanded,
-                        onDismissRequest = { isDropdownExpanded = false },
-                        modifier = Modifier.fillMaxWidth(0.9f)
-                    ) {
+                DropdownMenu(
+                    expanded = isDropdownExpanded,
+                    onDismissRequest = { isDropdownExpanded = false },
+                    modifier = Modifier.fillMaxWidth(0.9f)
+                ) {
+                    DropdownMenuItem(
+                        text = { Text("Auto-Reconocimiento por Cámara") },
+                        onClick = {
+                            viewModel.selectEmployee(null)
+                            isDropdownExpanded = false
+                        }
+                    )
+                    uiState.employees.forEach { employee ->
                         DropdownMenuItem(
-                            text = { Text("Auto-Reconocimiento por Cámara") },
+                            text = { Text("${employee.fullName} (${employee.employeeCode})") },
                             onClick = {
-                                viewModel.selectEmployee(null)
+                                viewModel.selectEmployee(employee)
                                 isDropdownExpanded = false
                             }
                         )
-                        uiState.employees.forEach { employee ->
-                            DropdownMenuItem(
-                                text = { Text("${employee.fullName} (${employee.employeeCode})") },
-                                onClick = {
-                                    viewModel.selectEmployee(employee)
-                                    isDropdownExpanded = false
-                                }
-                            )
-                        }
                     }
                 }
+            }
 
+            Spacer(modifier = Modifier.height(12.dp))
+
+            OutlinedButton(
+                onClick = {
+                    val activity = context as? FragmentActivity
+                    if (activity != null) {
+                        viewModel.authenticateWithFingerprint(activity)
+                    }
+                },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Icon(Icons.Default.Fingerprint, contentDescription = null)
+                Text(" 👆 Marcar con Huella Dactilar")
+            }
+
+            if (uiState.selectedEmployee != null) {
                 Spacer(modifier = Modifier.height(12.dp))
-
-                OutlinedButton(
-                    onClick = {
-                        val activity = context as? FragmentActivity
-                        if (activity != null) {
-                            viewModel.authenticateWithFingerprint(activity)
-                        }
-                    },
+                Button(
+                    onClick = viewModel::recordManualAttendance,
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary),
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Icon(Icons.Default.Fingerprint, contentDescription = null)
-                    Text(" 👆 Marcar con Huella Dactilar")
-                }
-
-                if (uiState.selectedEmployee != null) {
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Button(
-                        onClick = viewModel::recordManualAttendance,
-                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Icon(Icons.Default.Check, contentDescription = null)
-                        Text(" ✅ Confirmar Marcaje Manual para ${uiState.selectedEmployee?.firstName}")
-                    }
+                    Icon(Icons.Default.Check, contentDescription = null)
+                    Text(" ✅ Confirmar Marcaje Manual para ${uiState.selectedEmployee?.firstName}")
                 }
             }
         }

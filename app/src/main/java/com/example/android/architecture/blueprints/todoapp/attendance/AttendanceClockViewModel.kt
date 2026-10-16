@@ -36,6 +36,9 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import timber.log.Timber
+import java.text.SimpleDateFormat
+import java.util.Calendar
+import java.util.Locale
 import javax.inject.Inject
 
 data class AttendanceClockUiState(
@@ -43,9 +46,9 @@ data class AttendanceClockUiState(
     val employees: List<EmployeeEntity> = emptyList(),
     val attendanceType: AttendanceType = AttendanceType.CHECK_IN,
     val isFaceDetected: Boolean = false,
-    val statusMessage: String = "Colócate dentro del óvalo para marcar automáticamente tu entrada / salida",
+    val statusMessage: String = "Colócate dentro del óvalo para marcar automáticamente tu registro",
     val isSuccess: Boolean = false,
-    val isLocked: Boolean = false,
+    val isAlreadyRegisteredToday: Boolean = false,
     val isLoading: Boolean = false
 )
 
@@ -62,6 +65,10 @@ class AttendanceClockViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(AttendanceClockUiState())
     val uiState: StateFlow<AttendanceClockUiState> = _uiState.asStateFlow()
 
+    private var lastAutoScanTime = 0L
+    private val SCAN_COOLDOWN_MS = 3000L
+    private val timeFormat = SimpleDateFormat("hh:mm a", Locale.getDefault())
+
     init {
         viewModelScope.launch {
             employeeRepository.getEmployeesStream().collect { list ->
@@ -77,7 +84,7 @@ class AttendanceClockViewModel @Inject constructor(
                 statusMessage = if (employee != null)
                     "Empleado seleccionado: ${employee.fullName}"
                 else
-                    "Colócate dentro del óvalo para marcar automáticamente tu entrada / salida"
+                    "Colócate dentro del óvalo para marcar automáticamente tu registro"
             )
         }
     }
@@ -87,36 +94,24 @@ class AttendanceClockViewModel @Inject constructor(
             it.copy(
                 attendanceType = type,
                 isSuccess = false,
-                isLocked = false,
-                statusMessage = "Colócate dentro del óvalo para marcar automáticamente tu entrada / salida"
-            )
-        }
-    }
-
-    fun resetClockState() {
-        _uiState.update {
-            it.copy(
-                isSuccess = false,
-                isLocked = false,
-                selectedEmployee = null,
-                statusMessage = "Colócate dentro del óvalo para marcar automáticamente tu entrada / salida"
+                isAlreadyRegisteredToday = false,
+                statusMessage = "Colócate dentro del óvalo para marcar automáticamente tu registro"
             )
         }
     }
 
     fun onLiveFaceDetected(faceBitmap: Bitmap) {
-        val currentState = _uiState.value
-        if (currentState.isLocked || currentState.isLoading) return
+        val currentTime = System.currentTimeMillis()
+        if (currentTime - lastAutoScanTime < SCAN_COOLDOWN_MS) return
+        if (_uiState.value.isLoading) return
 
         viewModelScope.launch {
-            Timber.tag("FaceBiometrics").d("=== NUEVO FRAME DETECTADO EN CÁMARA (Dimensiones: %dx%d px) ===", faceBitmap.width, faceBitmap.height)
             _uiState.update { it.copy(isLoading = true, statusMessage = "Identificando rostro...") }
 
             val currentEmbedding = faceEmbedder.getEmbedding(faceBitmap)
             val enrolledEmployees = employeeRepository.getEmployeesWithBiometrics()
-            Timber.tag("FaceBiometrics").d("Empleados totales con biometría guardada en DB: %d", enrolledEmployees.size)
 
-            var matchedEmployee: EmployeeEntity? = currentState.selectedEmployee
+            var matchedEmployee: EmployeeEntity? = _uiState.value.selectedEmployee
             var matchPercentage = 100
 
             if (matchedEmployee == null) {
@@ -128,27 +123,60 @@ class AttendanceClockViewModel @Inject constructor(
             }
 
             if (matchedEmployee != null) {
-                Timber.tag("FaceBiometrics").i(">>> REGISTRO COMPLETADO: Empleado '%s' (%d%% coincidencia)", matchedEmployee.fullName, matchPercentage)
-                attendanceRepository.recordAttendance(
-                    employeeId = matchedEmployee.id,
-                    type = _uiState.value.attendanceType,
-                    verificationMethod = VerificationMethod.CAMERA
-                )
-                val typeLabel = if (_uiState.value.attendanceType == AttendanceType.CHECK_IN) "ENTRADA" else "SALIDA"
-                _uiState.update {
-                    it.copy(
-                        isLoading = false,
-                        isSuccess = true,
-                        isLocked = true,
-                        statusMessage = "¡$typeLabel Registrada para ${matchedEmployee.fullName} (Coincidencia $matchPercentage%)!"
+                lastAutoScanTime = System.currentTimeMillis()
+
+                val calendar = Calendar.getInstance().apply {
+                    set(Calendar.HOUR_OF_DAY, 0)
+                    set(Calendar.MINUTE, 0)
+                    set(Calendar.SECOND, 0)
+                    set(Calendar.MILLISECOND, 0)
+                }
+                val startOfDay = calendar.timeInMillis
+
+                val recordsToday = attendanceRepository.getAttendanceBetweenForEmployee(
+                    matchedEmployee.id,
+                    startOfDay,
+                    currentTime
+                ).sortedBy { it.timestamp }
+
+                val targetType = _uiState.value.attendanceType
+                val existingTodayRecord = recordsToday.find { it.type == targetType }
+
+                if (existingTodayRecord != null) {
+                    val formattedTime = timeFormat.format(existingTodayRecord.timestamp)
+                    val actionName = getActionLabel(targetType)
+                    Timber.tag("FaceBiometrics").i("REGISTRO EXISTENTE: El empleado '%s' ya registró %s hoy a las %s.", matchedEmployee.fullName, actionName, formattedTime)
+                    _uiState.update {
+                        it.copy(
+                            isLoading = false,
+                            isSuccess = false,
+                            isAlreadyRegisteredToday = true,
+                            statusMessage = "El día de hoy ya se registró $actionName a las $formattedTime: ${matchedEmployee.fullName}"
+                        )
+                    }
+                } else {
+                    val actionName = getActionLabel(targetType)
+                    Timber.tag("FaceBiometrics").i("NUEVO REGISTRO: Guardando %s para '%s' (%d%% coincidencia).", actionName, matchedEmployee.fullName, matchPercentage)
+                    attendanceRepository.recordAttendance(
+                        employeeId = matchedEmployee.id,
+                        type = targetType,
+                        verificationMethod = VerificationMethod.CAMERA
                     )
+                    _uiState.update {
+                        it.copy(
+                            isLoading = false,
+                            isSuccess = true,
+                            isAlreadyRegisteredToday = false,
+                            statusMessage = "¡$actionName Registrada Exitosamente para ${matchedEmployee.fullName}!"
+                        )
+                    }
                 }
             } else {
-                Timber.tag("FaceBiometrics").w(">>> NINGÚN EMPLEADO COINCIDE con el rostro detectado.")
                 _uiState.update {
                     it.copy(
                         isLoading = false,
                         isSuccess = false,
+                        isAlreadyRegisteredToday = false,
                         statusMessage = "Rostro detectado sin coincidencia suficiente. Reintenta o selecciona tu usuario."
                     )
                 }
@@ -163,20 +191,19 @@ class AttendanceClockViewModel @Inject constructor(
             return
         }
 
-        if (_uiState.value.isLocked) return
-
         viewModelScope.launch {
+            val targetType = _uiState.value.attendanceType
             attendanceRepository.recordAttendance(
                 employeeId = employee.id,
-                type = _uiState.value.attendanceType,
+                type = targetType,
                 verificationMethod = VerificationMethod.MANUAL
             )
-            val typeLabel = if (_uiState.value.attendanceType == AttendanceType.CHECK_IN) "ENTRADA" else "SALIDA"
+            val actionName = getActionLabel(targetType)
             _uiState.update {
                 it.copy(
                     isSuccess = true,
-                    isLocked = true,
-                    statusMessage = "¡$typeLabel Registrada Exitosamente para ${employee.fullName}!"
+                    isAlreadyRegisteredToday = false,
+                    statusMessage = "¡$actionName Registrada Exitosamente para ${employee.fullName}!"
                 )
             }
         }
@@ -189,23 +216,22 @@ class AttendanceClockViewModel @Inject constructor(
             return
         }
 
-        if (_uiState.value.isLocked) return
-
         biometricAuthManager.promptBiometric(
             activity = activity,
             onSuccess = {
                 viewModelScope.launch {
+                    val targetType = _uiState.value.attendanceType
                     attendanceRepository.recordAttendance(
                         employeeId = employee.id,
-                        type = _uiState.value.attendanceType,
+                        type = targetType,
                         verificationMethod = VerificationMethod.FINGERPRINT
                     )
-                    val typeLabel = if (_uiState.value.attendanceType == AttendanceType.CHECK_IN) "ENTRADA" else "SALIDA"
+                    val actionName = getActionLabel(targetType)
                     _uiState.update {
                         it.copy(
                             isSuccess = true,
-                            isLocked = true,
-                            statusMessage = "¡$typeLabel por Huella Registrada para ${employee.fullName}!"
+                            isAlreadyRegisteredToday = false,
+                            statusMessage = "¡$actionName por Huella Registrada para ${employee.fullName}!"
                         )
                     }
                 }
@@ -214,5 +240,14 @@ class AttendanceClockViewModel @Inject constructor(
                 _uiState.update { it.copy(statusMessage = "Error de huella: $err") }
             }
         )
+    }
+
+    private fun getActionLabel(type: AttendanceType): String {
+        return when (type) {
+            AttendanceType.CHECK_IN -> "Entrada a Laborar"
+            AttendanceType.MEAL_OUT -> "Salida a Comer"
+            AttendanceType.MEAL_IN -> "Regreso de Comer"
+            AttendanceType.CHECK_OUT -> "Salida Definitiva"
+        }
     }
 }
