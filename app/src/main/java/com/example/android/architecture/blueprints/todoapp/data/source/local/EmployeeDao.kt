@@ -30,6 +30,9 @@ interface EmployeeDao {
     @Query("SELECT * FROM employees ORDER BY lastName, firstName ASC")
     fun observeAll(): Flow<List<EmployeeEntity>>
 
+    @Query("SELECT * FROM employees")
+    suspend fun getAllEmployees(): List<EmployeeEntity>
+
     @Query("SELECT * FROM employees WHERE id = :employeeId")
     fun observeById(employeeId: String): Flow<EmployeeEntity?>
 

@@ -45,6 +45,8 @@ data class DailyEmployeeWorkStatus(
     val employee: EmployeeEntity,
     val isWorkingNow: Boolean,
     val checkInTimeFormatted: String?,
+    val mealOutTimeFormatted: String?,
+    val mealInTimeFormatted: String?,
     val checkOutTimeFormatted: String?,
     val elapsedTimeFormatted: String,
     val hoursWorkedToday: Double
@@ -52,6 +54,7 @@ data class DailyEmployeeWorkStatus(
 
 data class PayrollUiState(
     val isLoading: Boolean = false,
+    val isRefreshing: Boolean = false,
     val viewMode: PayrollViewMode = PayrollViewMode.TODAY,
     val dailyStatuses: List<DailyEmployeeWorkStatus> = emptyList(),
     val payrollSummaries: List<EmployeePayrollSummary> = emptyList(),
@@ -74,16 +77,27 @@ class PayrollViewModel @Inject constructor(
 
     init {
         loadTodayWorkStatus()
+
+        // Auto-observar reactivamente la base de datos de marcajes para actualizar en tiempo real
+        viewModelScope.launch {
+            attendanceRepository.getAttendanceBetween(0L, Long.MAX_VALUE).collect {
+                refreshCurrentView()
+            }
+        }
+    }
+
+    fun refreshCurrentView() {
+        when (_uiState.value.viewMode) {
+            PayrollViewMode.TODAY -> loadTodayWorkStatus()
+            PayrollViewMode.WEEKLY -> loadWeeklyPayroll()
+            PayrollViewMode.BIWEEKLY -> loadBiweeklyPayroll()
+        }
     }
 
     fun clearAllAttendanceRecords() {
         viewModelScope.launch {
             attendanceRepository.clearAllAttendanceRecords()
-            when (_uiState.value.viewMode) {
-                PayrollViewMode.TODAY -> loadTodayWorkStatus()
-                PayrollViewMode.WEEKLY -> loadWeeklyPayroll()
-                PayrollViewMode.BIWEEKLY -> loadBiweeklyPayroll()
-            }
+            refreshCurrentView()
         }
     }
 
@@ -92,6 +106,7 @@ class PayrollViewModel @Inject constructor(
             _uiState.update {
                 it.copy(
                     isLoading = true,
+                    isRefreshing = true,
                     viewMode = PayrollViewMode.TODAY,
                     periodLabel = "Asistencia y Horas Trabajadas Hoy"
                 )
@@ -114,38 +129,47 @@ class PayrollViewModel @Inject constructor(
                 val recordsToday = attendanceRepository.getAttendanceBetweenForEmployee(emp.id, startOfDay, now)
                     .sortedBy { it.timestamp }
 
+                val checkInRecord = recordsToday.find { it.type == AttendanceType.CHECK_IN }
+                val mealOutRecord = recordsToday.find { it.type == AttendanceType.MEAL_OUT }
+                val mealInRecord = recordsToday.find { it.type == AttendanceType.MEAL_IN }
+                val checkOutRecord = recordsToday.find { it.type == AttendanceType.CHECK_OUT }
+
+                val checkInFormatted = checkInRecord?.let { timeFormat.format(it.timestamp) }
+                val mealOutFormatted = mealOutRecord?.let { timeFormat.format(it.timestamp) }
+                val mealInFormatted = mealInRecord?.let { timeFormat.format(it.timestamp) }
+                val checkOutFormatted = checkOutRecord?.let { timeFormat.format(it.timestamp) }
+
                 val lastRecord = recordsToday.lastOrNull()
                 var isWorkingNow = false
-                var checkInFormatted: String? = null
-                var checkOutFormatted: String? = null
                 var elapsedTimeStr = "Sin entrada hoy"
                 var hoursToday = 0.0
 
                 if (lastRecord != null) {
-                    if (lastRecord.type == AttendanceType.CHECK_IN) {
-                        isWorkingNow = true
-                        workingCount++
-                        checkInFormatted = timeFormat.format(lastRecord.timestamp)
-
-                        val diffMs = now - lastRecord.timestamp
-                        val hrs = diffMs / (1000 * 60 * 60)
-                        val mins = (diffMs / (1000 * 60)) % 60
-                        elapsedTimeStr = "${hrs}h ${mins}m laborando hoy"
-                        hoursToday = diffMs / (1000.0 * 60.0 * 60.0)
-                    } else if (lastRecord.type == AttendanceType.CHECK_OUT) {
-                        isWorkingNow = false
-                        checkOutFormatted = timeFormat.format(lastRecord.timestamp)
-
-                        val firstCheckIn = recordsToday.firstOrNull { it.type == AttendanceType.CHECK_IN }
-                        if (firstCheckIn != null) {
-                            checkInFormatted = timeFormat.format(firstCheckIn.timestamp)
-                            val diffMs = lastRecord.timestamp - firstCheckIn.timestamp
+                    when (lastRecord.type) {
+                        AttendanceType.CHECK_IN -> {
+                            isWorkingNow = true
+                            workingCount++
+                            val diffMs = now - lastRecord.timestamp
                             val hrs = diffMs / (1000 * 60 * 60)
                             val mins = (diffMs / (1000 * 60)) % 60
-                            elapsedTimeStr = "Jornada completada (${hrs}h ${mins}m)"
+                            elapsedTimeStr = "Laborando (${hrs}h ${mins}m en este turno)"
                             hoursToday = diffMs / (1000.0 * 60.0 * 60.0)
-                        } else {
-                            elapsedTimeStr = "Salida registrada"
+                        }
+                        AttendanceType.MEAL_OUT -> {
+                            isWorkingNow = false
+                            elapsedTimeStr = "En horario de comida 🍲"
+                        }
+                        AttendanceType.MEAL_IN -> {
+                            isWorkingNow = true
+                            workingCount++
+                            val diffMs = now - lastRecord.timestamp
+                            val hrs = diffMs / (1000 * 60 * 60)
+                            val mins = (diffMs / (1000 * 60)) % 60
+                            elapsedTimeStr = "Laborando tras comida (${hrs}h ${mins}m del 2do turno)"
+                        }
+                        AttendanceType.CHECK_OUT -> {
+                            isWorkingNow = false
+                            elapsedTimeStr = "Jornada laboral completada"
                         }
                     }
                 }
@@ -155,6 +179,8 @@ class PayrollViewModel @Inject constructor(
                         employee = emp,
                         isWorkingNow = isWorkingNow,
                         checkInTimeFormatted = checkInFormatted,
+                        mealOutTimeFormatted = mealOutFormatted,
+                        mealInTimeFormatted = mealInFormatted,
                         checkOutTimeFormatted = checkOutFormatted,
                         elapsedTimeFormatted = elapsedTimeStr,
                         hoursWorkedToday = hoursToday
@@ -165,6 +191,7 @@ class PayrollViewModel @Inject constructor(
             _uiState.update {
                 it.copy(
                     isLoading = false,
+                    isRefreshing = false,
                     dailyStatuses = statuses,
                     activeEmployeesWorkingNow = workingCount
                 )
@@ -194,7 +221,7 @@ class PayrollViewModel @Inject constructor(
 
     private fun calculatePayrollForPeriod(startTime: Long, endTime: Long, label: String, mode: PayrollViewMode) {
         viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true, viewMode = mode, periodLabel = label) }
+            _uiState.update { it.copy(isLoading = true, isRefreshing = true, viewMode = mode, periodLabel = label) }
 
             val employees = getAllEmployees()
             val summaries = mutableListOf<EmployeePayrollSummary>()
@@ -210,6 +237,7 @@ class PayrollViewModel @Inject constructor(
             _uiState.update {
                 it.copy(
                     isLoading = false,
+                    isRefreshing = false,
                     payrollSummaries = summaries,
                     totalPayrollCost = grandTotal
                 )

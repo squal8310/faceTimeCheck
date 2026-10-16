@@ -30,6 +30,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -56,6 +57,8 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.android.architecture.blueprints.todoapp.data.EmployeePayrollSummary
+import com.google.accompanist.swiperefresh.SwipeRefresh
+import com.google.accompanist.swiperefresh.rememberSwipeRefreshState
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -100,6 +103,12 @@ fun PayrollScreen(
                     }
                 },
                 actions = {
+                    IconButton(onClick = viewModel::refreshCurrentView) {
+                        Icon(
+                            Icons.Default.Refresh,
+                            contentDescription = "Actualizar Pantalla"
+                        )
+                    }
                     IconButton(onClick = { showDeleteConfirmDialog = true }) {
                         Icon(
                             Icons.Default.Delete,
@@ -112,142 +121,148 @@ fun PayrollScreen(
         },
         modifier = modifier
     ) { paddingValues ->
-        Column(
+        SwipeRefresh(
+            state = rememberSwipeRefreshState(isRefreshing = uiState.isRefreshing),
+            onRefresh = viewModel::refreshCurrentView,
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
-                .padding(16.dp)
         ) {
-            // Fila de Filtros (Hoy en Vivo / Semanal / Quincenal)
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceEvenly
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(16.dp)
             ) {
-                Button(
-                    onClick = viewModel::loadTodayWorkStatus,
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = if (uiState.viewMode == PayrollViewMode.TODAY)
-                            MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant
-                    )
-                ) {
-                    Text("⏱️ Hoy")
-                }
-
-                Button(
-                    onClick = viewModel::loadWeeklyPayroll,
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = if (uiState.viewMode == PayrollViewMode.WEEKLY)
-                            MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant
-                    )
-                ) {
-                    Text("📅 Semanal")
-                }
-
-                Button(
-                    onClick = viewModel::loadBiweeklyPayroll,
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = if (uiState.viewMode == PayrollViewMode.BIWEEKLY)
-                            MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant
-                    )
-                ) {
-                    Text("🗓️ Quincenal")
-                }
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            if (uiState.viewMode == PayrollViewMode.TODAY) {
-                // Vista de Asistencia e Registro de Horas Hoy
-                Card(
+                // Fila de Filtros (Hoy en Vivo / Semanal / Quincenal)
+                Row(
                     modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
+                    horizontalArrangement = Arrangement.SpaceEvenly
                 ) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Text(
-                            text = uiState.periodLabel,
-                            style = MaterialTheme.typography.titleMedium
+                    Button(
+                        onClick = viewModel::loadTodayWorkStatus,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = if (uiState.viewMode == PayrollViewMode.TODAY)
+                                MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant
                         )
-                        Text(
-                            text = "Empleados Laborando Ahora: ${uiState.activeEmployeesWorkingNow}",
-                            style = MaterialTheme.typography.headlineSmall,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer
-                        )
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(12.dp))
-
-                // Botón de acceso directo para limpiar historial de registros durante pruebas
-                OutlinedButton(
-                    onClick = { showDeleteConfirmDialog = true },
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error)
-                ) {
-                    Icon(Icons.Default.Delete, contentDescription = null)
-                    Text(" 🗑️ Borrar Historial de Marcajes (Pruebas)")
-                }
-
-                Spacer(modifier = Modifier.height(12.dp))
-
-                if (uiState.dailyStatuses.isEmpty()) {
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
                     ) {
-                        Text("No hay empleados registrados.")
+                        Text("⏱️ Hoy")
                     }
-                } else {
-                    LazyColumn(modifier = Modifier.fillMaxSize()) {
-                        items(uiState.dailyStatuses) { status ->
-                            DailyWorkStatusCard(status = status)
-                            Spacer(modifier = Modifier.height(8.dp))
+
+                    Button(
+                        onClick = viewModel::loadWeeklyPayroll,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = if (uiState.viewMode == PayrollViewMode.WEEKLY)
+                                MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant
+                        )
+                    ) {
+                        Text("📅 Semanal")
+                    }
+
+                    Button(
+                        onClick = viewModel::loadBiweeklyPayroll,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = if (uiState.viewMode == PayrollViewMode.BIWEEKLY)
+                                MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant
+                        )
+                    ) {
+                        Text("🗓️ Quincenal")
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                if (uiState.viewMode == PayrollViewMode.TODAY) {
+                    // Vista de Asistencia e Registro de Horas Hoy
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Text(
+                                text = uiState.periodLabel,
+                                style = MaterialTheme.typography.titleMedium
+                            )
+                            Text(
+                                text = "Empleados Laborando Ahora: ${uiState.activeEmployeesWorkingNow}",
+                                style = MaterialTheme.typography.headlineSmall,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer
+                            )
                         }
                     }
-                }
-            } else {
-                // Vista de Nómina Semanal / Quincenal
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
-                ) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Text(
-                            text = "Periodo: ${uiState.periodLabel}",
-                            style = MaterialTheme.typography.titleMedium
-                        )
-                        Text(
-                            text = "Costo Total de Nómina: $${String.format("%.2f", uiState.totalPayrollCost)}",
-                            style = MaterialTheme.typography.headlineSmall,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer
-                        )
-                    }
-                }
 
-                Spacer(modifier = Modifier.height(12.dp))
+                    Spacer(modifier = Modifier.height(12.dp))
 
-                OutlinedButton(
-                    onClick = { showDeleteConfirmDialog = true },
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error)
-                ) {
-                    Icon(Icons.Default.Delete, contentDescription = null)
-                    Text(" 🗑️ Borrar Historial de Marcajes (Pruebas)")
-                }
-
-                Spacer(modifier = Modifier.height(12.dp))
-
-                if (uiState.payrollSummaries.isEmpty()) {
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
+                    OutlinedButton(
+                        onClick = { showDeleteConfirmDialog = true },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error)
                     ) {
-                        Text("No hay registros de marcajes para este periodo.")
+                        Icon(Icons.Default.Delete, contentDescription = null)
+                        Text(" 🗑️ Borrar Historial de Marcajes (Pruebas)")
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    if (uiState.dailyStatuses.isEmpty()) {
+                        Box(
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text("No hay empleados registrados.")
+                        }
+                    } else {
+                        LazyColumn(modifier = Modifier.fillMaxSize()) {
+                            items(uiState.dailyStatuses) { status ->
+                                DailyWorkStatusCard(status = status)
+                                Spacer(modifier = Modifier.height(8.dp))
+                            }
+                        }
                     }
                 } else {
-                    LazyColumn(modifier = Modifier.fillMaxSize()) {
-                        items(uiState.payrollSummaries) { summary ->
-                            PayrollItemCard(summary = summary)
-                            Spacer(modifier = Modifier.height(8.dp))
+                    // Vista de Nómina Semanal / Quincenal
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Text(
+                                text = "Periodo: ${uiState.periodLabel}",
+                                style = MaterialTheme.typography.titleMedium
+                            )
+                            Text(
+                                text = "Costo Total de Nómina: $${String.format("%.2f", uiState.totalPayrollCost)}",
+                                style = MaterialTheme.typography.headlineSmall,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    OutlinedButton(
+                        onClick = { showDeleteConfirmDialog = true },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                    ) {
+                        Icon(Icons.Default.Delete, contentDescription = null)
+                        Text(" 🗑️ Borrar Historial de Marcajes (Pruebas)")
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    if (uiState.payrollSummaries.isEmpty()) {
+                        Box(
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text("No hay registros de marcajes para este periodo.")
+                        }
+                    } else {
+                        LazyColumn(modifier = Modifier.fillMaxSize()) {
+                            items(uiState.payrollSummaries) { summary ->
+                                PayrollItemCard(summary = summary)
+                                Spacer(modifier = Modifier.height(8.dp))
+                            }
                         }
                     }
                 }
@@ -284,6 +299,12 @@ private fun DailyWorkStatusCard(status: DailyEmployeeWorkStatus) {
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.error
                     )
+                } else if (status.mealOutTimeFormatted != null && status.mealInTimeFormatted == null) {
+                    Text(
+                        text = "🍲 EN COMIDA",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = Color(0xFFE65100)
+                    )
                 } else {
                     Text(
                         text = "⚪ SIN ENTRADA HOY",
@@ -301,13 +322,34 @@ private fun DailyWorkStatusCard(status: DailyEmployeeWorkStatus) {
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            if (status.checkInTimeFormatted != null) {
-                Text(
-                    text = "Hora de Entrada hoy: ${status.checkInTimeFormatted}" +
-                            if (status.checkOutTimeFormatted != null) " | Salida: ${status.checkOutTimeFormatted}" else "",
-                    style = MaterialTheme.typography.bodySmall
-                )
+            Column(modifier = Modifier.fillMaxWidth()) {
+                if (status.checkInTimeFormatted != null) {
+                    Text(
+                        text = "🏢 Entrada Laboral: ${status.checkInTimeFormatted}",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
+                if (status.mealOutTimeFormatted != null) {
+                    Text(
+                        text = "🍲 Salida a Comer: ${status.mealOutTimeFormatted}",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
+                if (status.mealInTimeFormatted != null) {
+                    Text(
+                        text = "🏢 Regreso de Comer: ${status.mealInTimeFormatted}",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
+                if (status.checkOutTimeFormatted != null) {
+                    Text(
+                        text = "🏁 Salida Definitiva: ${status.checkOutTimeFormatted}",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
             }
+
+            Spacer(modifier = Modifier.height(6.dp))
 
             Text(
                 text = "Estatus hoy: ${status.elapsedTimeFormatted}",

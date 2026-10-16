@@ -19,12 +19,14 @@ package com.example.android.architecture.blueprints.todoapp.employees
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.android.architecture.blueprints.todoapp.data.EmployeeRepository
+import com.example.android.architecture.blueprints.todoapp.data.JsonBackupManager
+import com.example.android.architecture.blueprints.todoapp.data.SecurityRepository
 import com.example.android.architecture.blueprints.todoapp.data.source.local.EmployeeEntity
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -36,16 +38,50 @@ data class EmployeesUiState(
 
 @HiltViewModel
 class EmployeesViewModel @Inject constructor(
-    private val employeeRepository: EmployeeRepository
+    private val employeeRepository: EmployeeRepository,
+    private val jsonBackupManager: JsonBackupManager,
+    val securityRepository: SecurityRepository
 ) : ViewModel() {
 
-    val uiState: StateFlow<EmployeesUiState> = employeeRepository.getEmployeesStream()
-        .map { list -> EmployeesUiState(employees = list) }
-        .stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5000),
-            initialValue = EmployeesUiState(isLoading = true)
-        )
+    private val _uiState = MutableStateFlow(EmployeesUiState())
+    val uiState: StateFlow<EmployeesUiState> = _uiState.asStateFlow()
+
+    init {
+        viewModelScope.launch {
+            employeeRepository.getEmployeesStream().collect { list ->
+                _uiState.update { it.copy(employees = list) }
+            }
+        }
+    }
+
+    fun changeAdminPin(newPin: String) {
+        if (newPin.isBlank() || newPin.length < 4) {
+            _uiState.update { it.copy(userMessage = "El PIN debe contener al menos 4 dígitos.") }
+            return
+        }
+        securityRepository.setAdminPin(newPin.trim())
+        _uiState.update { it.copy(userMessage = "PIN de Administrador actualizado exitosamente.") }
+    }
+
+    fun exportBackup() {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoading = true) }
+            val (_, message) = jsonBackupManager.exportBackupToJson()
+            _uiState.update { it.copy(isLoading = false, userMessage = message) }
+        }
+    }
+
+    fun importBackup() {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoading = true) }
+            val (_, message) = jsonBackupManager.importBackupFromJson()
+            _uiState.update { it.copy(isLoading = false, userMessage = message) }
+        }
+    }
+
+    fun userMessageShown() {
+        _uiState.update { it.copy(userMessage = null) }
+    }
 
     fun deactivateEmployee(employeeId: String) {
         viewModelScope.launch {

@@ -39,7 +39,11 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.painter.Painter
@@ -53,6 +57,7 @@ import com.example.android.architecture.blueprints.todoapp.R
 import com.example.android.architecture.blueprints.todoapp.TodoDestinations
 import com.example.android.architecture.blueprints.todoapp.TodoNavigationActions
 import com.example.android.architecture.blueprints.todoapp.TodoTheme
+import com.example.android.architecture.blueprints.todoapp.ui.components.AdminPinDialog
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 
@@ -61,9 +66,28 @@ fun AppModalDrawer(
     drawerState: DrawerState,
     currentRoute: String,
     navigationActions: TodoNavigationActions,
+    verifyAdminPin: ((String) -> Boolean)? = null,
     coroutineScope: CoroutineScope = rememberCoroutineScope(),
     content: @Composable () -> Unit
 ) {
+    var pendingAction by remember { mutableStateOf<(() -> Unit)?>(null) }
+    var showPinDialog by remember { mutableStateOf(false) }
+
+    if (showPinDialog && verifyAdminPin != null) {
+        AdminPinDialog(
+            onPinVerified = {
+                showPinDialog = false
+                pendingAction?.invoke()
+                pendingAction = null
+            },
+            onDismiss = {
+                showPinDialog = false
+                pendingAction = null
+            },
+            verifyPin = verifyAdminPin
+        )
+    }
+
     ModalNavigationDrawer(
         drawerState = drawerState,
         drawerContent = {
@@ -71,9 +95,23 @@ fun AppModalDrawer(
                 currentRoute = currentRoute,
                 navigateToTasks = { navigationActions.navigateToTasks() },
                 navigateToStatistics = { navigationActions.navigateToStatistics() },
-                navigateToEmployees = { navigationActions.navigateToEmployees() },
+                navigateToEmployees = {
+                    if (verifyAdminPin != null) {
+                        pendingAction = { navigationActions.navigateToEmployees() }
+                        showPinDialog = true
+                    } else {
+                        navigationActions.navigateToEmployees()
+                    }
+                },
                 navigateToAttendance = { navigationActions.navigateToAttendance() },
-                navigateToPayroll = { navigationActions.navigateToPayroll() },
+                navigateToPayroll = {
+                    if (verifyAdminPin != null) {
+                        pendingAction = { navigationActions.navigateToPayroll() }
+                        showPinDialog = true
+                    } else {
+                        navigationActions.navigateToPayroll()
+                    }
+                },
                 closeDrawer = { coroutineScope.launch { drawerState.close() } }
             )
         }

@@ -25,6 +25,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -38,6 +39,7 @@ import com.example.android.architecture.blueprints.todoapp.TodoDestinationsArgs.
 import com.example.android.architecture.blueprints.todoapp.TodoDestinationsArgs.USER_MESSAGE_ARG
 import com.example.android.architecture.blueprints.todoapp.addedittask.AddEditTaskScreen
 import com.example.android.architecture.blueprints.todoapp.attendance.AttendanceClockScreen
+import com.example.android.architecture.blueprints.todoapp.data.SecurityRepository
 import com.example.android.architecture.blueprints.todoapp.employees.AddEditEmployeeScreen
 import com.example.android.architecture.blueprints.todoapp.employees.EmployeesScreen
 import com.example.android.architecture.blueprints.todoapp.payroll.PayrollScreen
@@ -54,11 +56,13 @@ fun TodoNavGraph(
     navController: NavHostController = rememberNavController(),
     coroutineScope: CoroutineScope = rememberCoroutineScope(),
     drawerState: DrawerState = rememberDrawerState(initialValue = DrawerValue.Closed),
-    startDestination: String = TodoDestinations.TASKS_ROUTE,
+    startDestination: String = TodoDestinations.ATTENDANCE_ROUTE, // Inicia directamente en el Checador de Asistencia para Kiosco
     navActions: TodoNavigationActions = remember(navController) {
         TodoNavigationActions(navController)
     }
 ) {
+    val context = LocalContext.current
+    val securityRepository = remember(context) { SecurityRepository(context) }
     val currentNavBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = currentNavBackStackEntry?.destination?.route ?: startDestination
 
@@ -67,29 +71,27 @@ fun TodoNavGraph(
         startDestination = startDestination,
         modifier = modifier
     ) {
-        composable(
-            TodoDestinations.TASKS_ROUTE,
-            arguments = listOf(
-                navArgument(USER_MESSAGE_ARG) { type = NavType.IntType; defaultValue = 0 }
-            )
-        ) { entry ->
-            AppModalDrawer(drawerState, currentRoute, navActions) {
-                TasksScreen(
-                    userMessage = entry.arguments?.getInt(USER_MESSAGE_ARG)!!,
-                    onUserMessageDisplayed = { entry.arguments?.putInt(USER_MESSAGE_ARG, 0) },
-                    onAddTask = { navActions.navigateToAddEditTask(R.string.add_task, null) },
-                    onTaskClick = { task -> navActions.navigateToTaskDetail(task.id) },
+        // Checador de Asistencia (Libre acceso para Kiosco de Empleados)
+        composable(TodoDestinations.ATTENDANCE_ROUTE) {
+            AppModalDrawer(
+                drawerState = drawerState,
+                currentRoute = currentRoute,
+                navigationActions = navActions,
+                verifyAdminPin = securityRepository::verifyAdminPin
+            ) {
+                AttendanceClockScreen(
                     openDrawer = { coroutineScope.launch { drawerState.open() } }
                 )
             }
         }
-        composable(TodoDestinations.STATISTICS_ROUTE) {
-            AppModalDrawer(drawerState, currentRoute, navActions) {
-                StatisticsScreen(openDrawer = { coroutineScope.launch { drawerState.open() } })
-            }
-        }
+        // Gestión de Empleados (Protegido con PIN de Administrador/HR)
         composable(TodoDestinations.EMPLOYEES_ROUTE) {
-            AppModalDrawer(drawerState, currentRoute, navActions) {
+            AppModalDrawer(
+                drawerState = drawerState,
+                currentRoute = currentRoute,
+                navigationActions = navActions,
+                verifyAdminPin = securityRepository::verifyAdminPin
+            ) {
                 EmployeesScreen(
                     openDrawer = { coroutineScope.launch { drawerState.open() } },
                     onAddEmployee = { navActions.navigateToAddEditEmployee() },
@@ -107,18 +109,48 @@ fun TodoNavGraph(
                 onBack = { navController.popBackStack() }
             )
         }
-        composable(TodoDestinations.ATTENDANCE_ROUTE) {
-            AppModalDrawer(drawerState, currentRoute, navActions) {
-                AttendanceClockScreen(
+        // Cálculo de Nómina (Protegido con PIN de Administrador/HR)
+        composable(TodoDestinations.PAYROLL_ROUTE) {
+            AppModalDrawer(
+                drawerState = drawerState,
+                currentRoute = currentRoute,
+                navigationActions = navActions,
+                verifyAdminPin = securityRepository::verifyAdminPin
+            ) {
+                PayrollScreen(
                     openDrawer = { coroutineScope.launch { drawerState.open() } }
                 )
             }
         }
-        composable(TodoDestinations.PAYROLL_ROUTE) {
-            AppModalDrawer(drawerState, currentRoute, navActions) {
-                PayrollScreen(
+        composable(
+            TodoDestinations.TASKS_ROUTE,
+            arguments = listOf(
+                navArgument(USER_MESSAGE_ARG) { type = NavType.IntType; defaultValue = 0 }
+            )
+        ) { entry ->
+            AppModalDrawer(
+                drawerState = drawerState,
+                currentRoute = currentRoute,
+                navigationActions = navActions,
+                verifyAdminPin = securityRepository::verifyAdminPin
+            ) {
+                TasksScreen(
+                    userMessage = entry.arguments?.getInt(USER_MESSAGE_ARG)!!,
+                    onUserMessageDisplayed = { entry.arguments?.putInt(USER_MESSAGE_ARG, 0) },
+                    onAddTask = { navActions.navigateToAddEditTask(R.string.add_task, null) },
+                    onTaskClick = { task -> navActions.navigateToTaskDetail(task.id) },
                     openDrawer = { coroutineScope.launch { drawerState.open() } }
                 )
+            }
+        }
+        composable(TodoDestinations.STATISTICS_ROUTE) {
+            AppModalDrawer(
+                drawerState = drawerState,
+                currentRoute = currentRoute,
+                navigationActions = navActions,
+                verifyAdminPin = securityRepository::verifyAdminPin
+            ) {
+                StatisticsScreen(openDrawer = { coroutineScope.launch { drawerState.open() } })
             }
         }
         composable(
