@@ -33,4 +33,5 @@ interface AttendanceRepository {
         notes: String? = null
     ): AttendanceRecordEntity
     suspend fun getLastRecordForEmployee(employeeId: String): AttendanceRecordEntity?
+    suspend fun clearAllAttendanceRecords()
 }

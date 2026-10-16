@@ -41,4 +41,7 @@ interface AttendanceDao {
 
     @Query("DELETE FROM attendance_records WHERE id = :recordId")
     suspend fun deleteById(recordId: String): Int
+
+    @Query("DELETE FROM attendance_records")
+    suspend fun deleteAll(): Int
 }

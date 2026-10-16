@@ -22,20 +22,42 @@ import com.example.android.architecture.blueprints.todoapp.data.AttendanceReposi
 import com.example.android.architecture.blueprints.todoapp.data.EmployeePayrollSummary
 import com.example.android.architecture.blueprints.todoapp.data.EmployeeRepository
 import com.example.android.architecture.blueprints.todoapp.data.PayrollCalculatorUseCase
+import com.example.android.architecture.blueprints.todoapp.data.source.local.AttendanceType
+import com.example.android.architecture.blueprints.todoapp.data.source.local.EmployeeEntity
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
 import java.util.Calendar
+import java.util.Locale
 import javax.inject.Inject
+
+enum class PayrollViewMode {
+    TODAY,
+    WEEKLY,
+    BIWEEKLY
+}
+
+data class DailyEmployeeWorkStatus(
+    val employee: EmployeeEntity,
+    val isWorkingNow: Boolean,
+    val checkInTimeFormatted: String?,
+    val checkOutTimeFormatted: String?,
+    val elapsedTimeFormatted: String,
+    val hoursWorkedToday: Double
+)
 
 data class PayrollUiState(
     val isLoading: Boolean = false,
+    val viewMode: PayrollViewMode = PayrollViewMode.TODAY,
+    val dailyStatuses: List<DailyEmployeeWorkStatus> = emptyList(),
     val payrollSummaries: List<EmployeePayrollSummary> = emptyList(),
     val totalPayrollCost: Double = 0.0,
-    val periodLabel: String = "Esta Semana"
+    val activeEmployeesWorkingNow: Int = 0,
+    val periodLabel: String = "Estado de Asistencia Hoy"
 )
 
 @HiltViewModel
@@ -48,8 +70,106 @@ class PayrollViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(PayrollUiState())
     val uiState: StateFlow<PayrollUiState> = _uiState.asStateFlow()
 
+    private val timeFormat = SimpleDateFormat("hh:mm a", Locale.getDefault())
+
     init {
-        loadWeeklyPayroll()
+        loadTodayWorkStatus()
+    }
+
+    fun clearAllAttendanceRecords() {
+        viewModelScope.launch {
+            attendanceRepository.clearAllAttendanceRecords()
+            when (_uiState.value.viewMode) {
+                PayrollViewMode.TODAY -> loadTodayWorkStatus()
+                PayrollViewMode.WEEKLY -> loadWeeklyPayroll()
+                PayrollViewMode.BIWEEKLY -> loadBiweeklyPayroll()
+            }
+        }
+    }
+
+    fun loadTodayWorkStatus() {
+        viewModelScope.launch {
+            _uiState.update {
+                it.copy(
+                    isLoading = true,
+                    viewMode = PayrollViewMode.TODAY,
+                    periodLabel = "Asistencia y Horas Trabajadas Hoy"
+                )
+            }
+
+            val calendar = Calendar.getInstance().apply {
+                set(Calendar.HOUR_OF_DAY, 0)
+                set(Calendar.MINUTE, 0)
+                set(Calendar.SECOND, 0)
+                set(Calendar.MILLISECOND, 0)
+            }
+            val startOfDay = calendar.timeInMillis
+            val now = System.currentTimeMillis()
+
+            val employees = getAllEmployees()
+            val statuses = mutableListOf<DailyEmployeeWorkStatus>()
+            var workingCount = 0
+
+            for (emp in employees) {
+                val recordsToday = attendanceRepository.getAttendanceBetweenForEmployee(emp.id, startOfDay, now)
+                    .sortedBy { it.timestamp }
+
+                val lastRecord = recordsToday.lastOrNull()
+                var isWorkingNow = false
+                var checkInFormatted: String? = null
+                var checkOutFormatted: String? = null
+                var elapsedTimeStr = "Sin entrada hoy"
+                var hoursToday = 0.0
+
+                if (lastRecord != null) {
+                    if (lastRecord.type == AttendanceType.CHECK_IN) {
+                        isWorkingNow = true
+                        workingCount++
+                        checkInFormatted = timeFormat.format(lastRecord.timestamp)
+
+                        val diffMs = now - lastRecord.timestamp
+                        val hrs = diffMs / (1000 * 60 * 60)
+                        val mins = (diffMs / (1000 * 60)) % 60
+                        elapsedTimeStr = "${hrs}h ${mins}m laborando hoy"
+                        hoursToday = diffMs / (1000.0 * 60.0 * 60.0)
+                    } else if (lastRecord.type == AttendanceType.CHECK_OUT) {
+                        isWorkingNow = false
+                        checkOutFormatted = timeFormat.format(lastRecord.timestamp)
+
+                        val firstCheckIn = recordsToday.firstOrNull { it.type == AttendanceType.CHECK_IN }
+                        if (firstCheckIn != null) {
+                            checkInFormatted = timeFormat.format(firstCheckIn.timestamp)
+                            val diffMs = lastRecord.timestamp - firstCheckIn.timestamp
+                            val hrs = diffMs / (1000 * 60 * 60)
+                            val mins = (diffMs / (1000 * 60)) % 60
+                            elapsedTimeStr = "Jornada completada (${hrs}h ${mins}m)"
+                            hoursToday = diffMs / (1000.0 * 60.0 * 60.0)
+                        } else {
+                            elapsedTimeStr = "Salida registrada"
+                        }
+                    }
+                }
+
+                statuses.add(
+                    DailyEmployeeWorkStatus(
+                        employee = emp,
+                        isWorkingNow = isWorkingNow,
+                        checkInTimeFormatted = checkInFormatted,
+                        checkOutTimeFormatted = checkOutFormatted,
+                        elapsedTimeFormatted = elapsedTimeStr,
+                        hoursWorkedToday = hoursToday
+                    )
+                )
+            }
+
+            _uiState.update {
+                it.copy(
+                    isLoading = false,
+                    dailyStatuses = statuses,
+                    activeEmployeesWorkingNow = workingCount
+                )
+            }
+        }
     }
 
     fun loadWeeklyPayroll() {
@@ -59,7 +179,7 @@ class PayrollViewModel @Inject constructor(
         calendar.add(Calendar.DAY_OF_YEAR, -7)
         val startTime = calendar.timeInMillis
 
-        calculatePayrollForPeriod(startTime, endTime, "Últimos 7 días")
+        calculatePayrollForPeriod(startTime, endTime, "Últimos 7 días", PayrollViewMode.WEEKLY)
     }
 
     fun loadBiweeklyPayroll() {
@@ -69,19 +189,14 @@ class PayrollViewModel @Inject constructor(
         calendar.add(Calendar.DAY_OF_YEAR, -15)
         val startTime = calendar.timeInMillis
 
-        calculatePayrollForPeriod(startTime, endTime, "Últimos 15 días (Quincena)")
+        calculatePayrollForPeriod(startTime, endTime, "Últimos 15 días (Quincena)", PayrollViewMode.BIWEEKLY)
     }
 
-    private fun calculatePayrollForPeriod(startTime: Long, endTime: Long, label: String) {
+    private fun calculatePayrollForPeriod(startTime: Long, endTime: Long, label: String, mode: PayrollViewMode) {
         viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true, periodLabel = label) }
+            _uiState.update { it.copy(isLoading = true, viewMode = mode, periodLabel = label) }
 
-            val employees = employeeRepository.getEmployeesWithBiometrics().ifEmpty {
-                val list = mutableListOf<com.example.android.architecture.blueprints.todoapp.data.source.local.EmployeeEntity>()
-                employeeRepository.getEmployeesStream().collect { list.addAll(it) }
-                list
-            }
-
+            val employees = getAllEmployees()
             val summaries = mutableListOf<EmployeePayrollSummary>()
             var grandTotal = 0.0
 
@@ -100,5 +215,14 @@ class PayrollViewModel @Inject constructor(
                 )
             }
         }
+    }
+
+    private suspend fun getAllEmployees(): List<EmployeeEntity> {
+        val enrolled = employeeRepository.getEmployeesWithBiometrics()
+        if (enrolled.isNotEmpty()) return enrolled
+
+        val list = mutableListOf<EmployeeEntity>()
+        employeeRepository.getEmployeesStream().collect { list.addAll(it) }
+        return list
     }
 }

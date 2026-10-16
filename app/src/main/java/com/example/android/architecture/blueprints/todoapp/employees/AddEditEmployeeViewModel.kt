@@ -29,6 +29,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import timber.log.Timber
 import java.util.UUID
 import javax.inject.Inject
 
@@ -93,7 +94,10 @@ class AddEditEmployeeViewModel @Inject constructor(
 
     fun processFacePhoto(faceBitmap: Bitmap) {
         viewModelScope.launch {
+            Timber.tag("FaceBiometrics").d("=== CAPTURANDO Y PROCESANDO NUEVO ROSTRO DE ENROLAMIENTO ===")
+            Timber.tag("FaceBiometrics").d("Dimensiones foto original: %dx%d px", faceBitmap.width, faceBitmap.height)
             val embeddingArray = faceEmbedder.getEmbedding(faceBitmap)
+            Timber.tag("FaceBiometrics").i("Firma biométrica creada exitosamente (%d flotantes). Vector listo para guardar.", embeddingArray.size)
             _uiState.update {
                 it.copy(
                     capturedBitmap = faceBitmap,
@@ -125,6 +129,8 @@ class AddEditEmployeeViewModel @Inject constructor(
                 faceEmbedding = state.faceEmbedding,
                 isBiometricEnrolled = state.isBiometricEnrolled
             )
+            Timber.tag("FaceBiometrics").i("GUARDANDO EMPLEADO EN BASE DE DATOS: '%s' | Código: %s | Enrolado Biométrico: %b | Tamaño Embedding: %d",
+                emp.fullName, emp.employeeCode, emp.isBiometricEnrolled, emp.faceEmbedding?.size ?: 0)
             employeeRepository.saveEmployee(emp)
             _uiState.update { it.copy(isLoading = false, isSaved = true) }
         }

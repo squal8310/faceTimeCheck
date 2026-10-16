@@ -79,4 +79,10 @@ class DefaultAttendanceRepository @Inject constructor(
             attendanceDao.getLastRecordForEmployee(employeeId)
         }
     }
+
+    override suspend fun clearAllAttendanceRecords() {
+        withContext(dispatcher) {
+            attendanceDao.deleteAll()
+        }
+    }
 }

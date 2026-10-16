@@ -21,6 +21,7 @@ import android.graphics.Bitmap
 import dagger.hilt.android.qualifiers.ApplicationContext
 import org.tensorflow.lite.Interpreter
 import org.tensorflow.lite.support.common.FileUtil
+import timber.log.Timber
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import javax.inject.Inject
@@ -38,8 +39,10 @@ class TensorFlowFaceEmbedder @Inject constructor(
         try {
             val modelFile = FileUtil.loadMappedFile(context, MODEL_FILE_NAME)
             interpreter = Interpreter(modelFile)
+            Timber.tag("FaceBiometrics").i("Modelo TFLite '%s' cargado exitosamente desde assets.", MODEL_FILE_NAME)
         } catch (e: Exception) {
             interpreter = null
+            Timber.tag("FaceBiometrics").w("No se encontró el modelo TFLite '%s' en assets. Se usará el extractor algorítmico secundario.", MODEL_FILE_NAME)
         }
     }
 
@@ -51,8 +54,11 @@ class TensorFlowFaceEmbedder @Inject constructor(
         val activeInterpreter = interpreter
         if (activeInterpreter != null) {
             activeInterpreter.run(inputBuffer, outputArray)
-            return outputArray[0]
+            val embedding = outputArray[0]
+            Timber.tag("FaceBiometrics").d("Inferencia TFLite ejecutada. Vector extraído (%d flotantes). Muestra: [%.3f, %.3f, %.3f]", embedding.size, embedding[0], embedding[1], embedding[2])
+            return embedding
         } else {
+            Timber.tag("FaceBiometrics").d("Ejecutando extractor alternativo de vectores (%dx%d px).", faceBitmap.width, faceBitmap.height)
             return generatePseudoEmbedding(resizedBitmap)
         }
     }
